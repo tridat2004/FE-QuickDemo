@@ -3,4 +3,12 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
   srcDir: 'src/',
+  
+  // Add Tailwind CSS
+  css: ['~/assets/css/main.css'],
+  
+  modules: [
+    '@nuxt/ui'
+  ],
+  
 })
