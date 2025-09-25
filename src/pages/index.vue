@@ -280,8 +280,16 @@ const loadFilteredArticles = async () => {
       page: pagination.value.currentPage,
       limit: pagination.value.itemsPerPage,
     }
+
     const res = await $api.get('/crawl_data/filter', { params })
-    allArticles.value = res.data.articles || []
+
+    if (res && res.data) {
+      allArticles.value = res.data.articles || []
+      pagination.value.total = res.data.total || 0
+    } else {
+      console.error("API returned empty response:", res)
+      allArticles.value = []
+    }
   } catch (error) {
     console.error('Error loading filtered articles:', error)
     allArticles.value = []
@@ -289,6 +297,7 @@ const loadFilteredArticles = async () => {
     isLoading.value = false
   }
 }
+
 
 
 
