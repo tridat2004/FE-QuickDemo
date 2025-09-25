@@ -23,12 +23,12 @@
     />
 
     <!-- Results Summary -->
-    <div class="results-summary" v-if="filteredArticles.length > 0">
-      <p>Tổng số bài viết: <strong>{{ totalArticles }}</strong> - Tìm thấy <strong>{{ filteredArticles.length }}</strong> bài viết</p>
+    <div class="results-summary" v-if="searchResults.total > 0">
+      <p>Tổng số bài viết: <strong>{{ totalArticles }}</strong> - Tìm thấy <strong>{{ searchResults.total }}</strong> bài viết</p>
     </div>
 
     <!-- No Results -->
-    <div class="no-results" v-if="filteredArticles.length === 0">
+    <div class="no-results" v-if="searchResults.total === 0 && !isLoading">
       <div class="no-results-icon">
         <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
           <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/>
@@ -40,9 +40,9 @@
     </div>
 
     <!-- Articles Grid -->
-    <div class="articles-grid" v-if="paginatedArticles.length > 0">
+    <div class="articles-grid" v-if="searchResults.articles && searchResults.articles.length > 0">
       <ArticleCard
-        v-for="article in paginatedArticles"
+        v-for="article in searchResults.articles"
         :key="article.id"
         :article="article"
       />
@@ -50,13 +50,14 @@
 
     <!-- Pagination -->
     <Pagination
-  v-if="filteredArticles.length > 0"
-  :currentPage="pagination.currentPage"
-  :itemsPerPage="pagination.itemsPerPage"
-  :totalItems="filteredArticles.length"
-  @update:currentPage="pagination.currentPage = $event"
-  @update:itemsPerPage="pagination.itemsPerPage = $event"
-/>
+      v-if="searchResults.total > 0"
+      :currentPage="pagination.currentPage"
+      :itemsPerPage="pagination.itemsPerPage"
+      :totalItems="searchResults.total"
+      :totalPages="searchResults.totalPages"
+      @update:currentPage="updateCurrentPage"
+      @update:itemsPerPage="updateItemsPerPage"
+    />
 
     <!-- Loading State -->
     <div class="loading" v-if="isLoading">
@@ -68,8 +69,8 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-
 import { useHead } from '#app'
+
 // SEO Meta
 useHead({
   title: 'Dashboard Tin Tức',
@@ -82,6 +83,14 @@ useHead({
 const isLoading = ref(false)
 const allArticles = ref([])
 const totalArticles = ref(0)
+const searchResults = ref({
+  articles: [],
+  total: 0,
+  totalPages: 0,
+  hasNextPage: false,
+  hasPreviousPage: false
+})
+
 const filters = ref({
   search: '',
   category: '',
@@ -91,25 +100,31 @@ const filters = ref({
 
 const pagination = ref({
   currentPage: 1,
-  itemsPerPage: 100   
+  itemsPerPage: 12  // 👈 Thay đổi từ 100 thành 12
 })
 
+const { $api } = useNuxtApp()
 
-
-const { $api } = useNuxtApp() // Lấy instance axios từ plugin
-
+// Load total articles count
 const loadTotal = async () => {
-  isLoading.value = true
-  console.log('Starting axios request...'); // Debug: Xác nhận hàm chạy
   try {
-    const response = await $api.get('/crawl_data/total') // Gọi trực tiếp đến cổng 3001
-    console.log('Axios response:', response.data); // Debug: Dữ liệu từ API
-    totalArticles.value = response.data.total || 0
+    const response = await $api.get('/crawl_data/total')
+    console.log('Total articles:', response.data)
+    totalArticles.value = response.data.totalItems || 0
   } catch (error) {
-    console.error('Error loading total:', error); // Debug: Xem lỗi cụ thể
+    console.error('Error loading total:', error)
     totalArticles.value = 0
-  } finally {
-    isLoading.value = false
+  }
+}
+
+// Load all articles for category stats (không phân trang)
+const loadAllArticlesForStats = async () => {
+  try {
+    const response = await $api.get('/crawl_data/all-for-stats')
+    allArticles.value = response.data.articles || []
+  } catch (error) {
+    console.error('Error loading articles for stats:', error)
+    allArticles.value = []
   }
 }
 
@@ -119,109 +134,27 @@ const availableCategories = computed(() => {
   return categories.sort()
 })
 
-const parseVietnameseDate = (dateString) => {
-  try {
-    // Format: "Thứ ba, 23/9/2025, 10:31 (GMT+7)"
-    const dateMatch = dateString.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/)
-    if (!dateMatch) return null
-
-    const [, day, month, year] = dateMatch
-    
-    // Tách lấy phần thời gian nếu có
-    const timeMatch = dateString.match(/(\d{1,2}):(\d{2})/)
-    let hour = 0, minute = 0
-    if (timeMatch) {
-      [, hour, minute] = timeMatch.map(Number)
-    }
-
-    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day), hour, minute)
-  } catch (error) {
-    console.error('Error parsing date:', dateString, error)
-    return null
-  }
-}
-const formatDateForDisplay = (dateString) => {
-  const date = parseVietnameseDate(dateString)
-  if (!date) return dateString
-
-  const day = date.getDate().toString().padStart(2, '0')
-  const month = (date.getMonth() + 1).toString().padStart(2, '0')
-  const year = date.getFullYear()
-  
-  return `${day}/${month}/${year}`
-}
-const filteredArticles = computed(() => {
-  let filtered = allArticles.value
-
-  // Search filter
-  if (filters.value.search) {
-    const searchTerm = filters.value.search.toLowerCase()
-    filtered = filtered.filter(article =>
-      article.title.toLowerCase().includes(searchTerm) ||
-      article.category.toLowerCase().includes(searchTerm)
-    )
-  }
-
-  // Category filter
-  if (filters.value.category) {
-    filtered = filtered.filter(article => article.category === filters.value.category)
-  }
-
-  // Date filters với xử lý Vietnamese date format
-  if (filters.value.dateFrom) {
-    filtered = filtered.filter(article => {
-      const articleDate = parseVietnameseDate(article.published_time)
-      if (!articleDate) return false
-      
-      const fromDate = new Date(filters.value.dateFrom)
-      return articleDate >= fromDate
-    })
-  }
-
-  if (filters.value.dateTo) {
-    filtered = filtered.filter(article => {
-      const articleDate = parseVietnameseDate(article.published_time)
-      if (!articleDate) return false
-      
-      const toDate = new Date(filters.value.dateTo)
-      toDate.setHours(23, 59, 59, 999) // End of day
-      return articleDate <= toDate
-    })
-  }
-
-  return filtered
-})
-
-const paginatedArticles = computed(() => {
-  const start = (pagination.value.currentPage - 1) * pagination.value.itemsPerPage
-  const end = start + pagination.value.itemsPerPage
-  return filteredArticles.value.slice(start, end)
-})
-
 // Methods
 const updateCategory = (category) => {
   filters.value.category = category
   pagination.value.currentPage = 1
 }
 
-const loadArticles = async () => {
-  isLoading.value = true
-  try {
-    const res = await $api.get('/crawl_data/list') // 👈 gọi endpoint mới
-    console.log('Articles from API:', res.data.articles)
-    allArticles.value = res.data.articles || []
-  } catch (error) {
-    console.error('Error loading articles:', error)
-  } finally {
-    isLoading.value = false
-  }
+const updateCurrentPage = (page) => {
+  pagination.value.currentPage = page
 }
 
+const updateItemsPerPage = (itemsPerPage) => {
+  pagination.value.itemsPerPage = itemsPerPage
+  pagination.value.currentPage = 1
+}
+
+// Load filtered articles with pagination
 const loadFilteredArticles = async () => {
   isLoading.value = true
   try {
     const params = {
-      search: filters.value.search || undefined,
+      searchQuery: filters.value.search || undefined,
       category: filters.value.category || undefined,
       dateFrom: filters.value.dateFrom || undefined,
       dateTo: filters.value.dateTo || undefined,
@@ -229,40 +162,68 @@ const loadFilteredArticles = async () => {
       limit: pagination.value.itemsPerPage,
     }
 
+    // Loại bỏ các params undefined
+    Object.keys(params).forEach(key => {
+      if (params[key] === undefined) {
+        delete params[key]
+      }
+    })
+
+    console.log('API params:', params)
     const res = await $api.get('/crawl_data/filter', { params })
+    console.log('API response:', res.data)
 
     if (res && res.data) {
-      allArticles.value = res.data.articles || []
-      pagination.value.total = res.data.total || 0
+      searchResults.value = {
+        articles: res.data.articles || [],
+        total: res.data.total || 0,
+        totalPages: res.data.totalPages || 0,
+        hasNextPage: res.data.hasNextPage || false,
+        hasPreviousPage: res.data.hasPreviousPage || false
+      }
     } else {
       console.error("API returned empty response:", res)
-      allArticles.value = []
+      searchResults.value = {
+        articles: [],
+        total: 0,
+        totalPages: 0,
+        hasNextPage: false,
+        hasPreviousPage: false
+      }
     }
   } catch (error) {
     console.error('Error loading filtered articles:', error)
-    allArticles.value = []
+    searchResults.value = {
+      articles: [],
+      total: 0,
+      totalPages: 0,
+      hasNextPage: false,
+      hasPreviousPage: false
+    }
   } finally {
     isLoading.value = false
   }
 }
 
-
-
-
 // Watchers
 watch(() => filters.value, () => {
   pagination.value.currentPage = 1
-
-  if (!filters.value.search && !filters.value.category && !filters.value.dateFrom && !filters.value.dateTo) {
-    loadArticles() // lấy toàn bộ bài viết
-  } else {
-    loadFilteredArticles()
-  }
+  loadFilteredArticles()
 }, { deep: true })
+
+watch(() => pagination.value.currentPage, () => {
+  loadFilteredArticles()
+})
+
+watch(() => pagination.value.itemsPerPage, () => {
+  loadFilteredArticles()
+})
 
 // Lifecycle
 onMounted(() => {
-  loadArticles(),loadTotal()
+  loadTotal()
+  loadAllArticlesForStats() // Load tất cả articles cho category stats
+  loadFilteredArticles() // Load articles với pagination
 })
 </script>
 
