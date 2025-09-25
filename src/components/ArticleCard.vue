@@ -29,11 +29,21 @@ const props = defineProps({
 })
 
 const formatDate = (dateString) => {
-  const date = new Date(dateString)
-  return date.toLocaleDateString('vi-VN', {
+  if (!dateString) return 'Chưa có ngày'
+
+  // Regex: bắt "24/9/2025, 14:35"
+  const match = dateString.match(/(\d{1,2})\/(\d{1,2})\/(\d{4}),\s*(\d{1,2}):(\d{2})/)
+  if (!match) return dateString // fallback: nếu không khớp thì trả nguyên văn
+
+  const [ , day, month, year, hour, minute ] = match
+  const date = new Date(year, month - 1, day, hour, minute)
+
+  return date.toLocaleString('vi-VN', {
     year: 'numeric',
     month: 'long',
-    day: 'numeric'
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
   })
 }
 </script>

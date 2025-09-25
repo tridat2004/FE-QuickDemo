@@ -24,7 +24,7 @@
 
     <!-- Results Summary -->
     <div class="results-summary" v-if="filteredArticles.length > 0">
-      <p>Tìm thấy <strong>{{ filteredArticles.length }}</strong> bài viết</p>
+      <p>Tổng số bài viết: <strong>{{ totalArticles }}</strong> - Tìm thấy <strong>{{ filteredArticles.length }}</strong> bài viết</p>
     </div>
 
     <!-- No Results -->
@@ -69,6 +69,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 
+import { useHead } from '#app'
 // SEO Meta
 useHead({
   title: 'Dashboard Tin Tức',
@@ -80,7 +81,7 @@ useHead({
 // State
 const isLoading = ref(false)
 const allArticles = ref([])
-
+const totalArticles = ref(0)
 const filters = ref({
   search: '',
   category: '',
@@ -90,8 +91,27 @@ const filters = ref({
 
 const pagination = ref({
   currentPage: 1,
-  itemsPerPage: 6   
+  itemsPerPage: 100   
 })
+
+
+
+const { $api } = useNuxtApp() // Lấy instance axios từ plugin
+
+const loadTotal = async () => {
+  isLoading.value = true
+  console.log('Starting axios request...'); // Debug: Xác nhận hàm chạy
+  try {
+    const response = await $api.get('/crawl_data/total') // Gọi trực tiếp đến cổng 3001
+    console.log('Axios response:', response.data); // Debug: Dữ liệu từ API
+    totalArticles.value = response.data.total || 0
+  } catch (error) {
+    console.error('Error loading total:', error); // Debug: Xem lỗi cụ thể
+    totalArticles.value = 0
+  } finally {
+    isLoading.value = false
+  }
+}
 
 const mockArticles = [
   {
@@ -239,9 +259,9 @@ const updateCategory = (category) => {
 const loadArticles = async () => {
   isLoading.value = true
   try {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    allArticles.value = mockArticles
+    const res = await $api.get('/crawl_data/list') // 👈 gọi endpoint mới
+    console.log('Articles from API:', res.data.articles)
+    allArticles.value = res.data.articles || []
   } catch (error) {
     console.error('Error loading articles:', error)
   } finally {
@@ -249,14 +269,43 @@ const loadArticles = async () => {
   }
 }
 
+const loadFilteredArticles = async () => {
+  isLoading.value = true
+  try {
+    const params = {
+      search: filters.value.search || undefined,
+      category: filters.value.category || undefined,
+      dateFrom: filters.value.dateFrom || undefined,
+      dateTo: filters.value.dateTo || undefined,
+      page: pagination.value.currentPage,
+      limit: pagination.value.itemsPerPage,
+    }
+    const res = await $api.get('/crawl_data/filter', { params })
+    allArticles.value = res.data.articles || []
+  } catch (error) {
+    console.error('Error loading filtered articles:', error)
+    allArticles.value = []
+  } finally {
+    isLoading.value = false
+  }
+}
+
+
+
 // Watchers
 watch(() => filters.value, () => {
   pagination.value.currentPage = 1
+
+  if (!filters.value.search && !filters.value.category && !filters.value.dateFrom && !filters.value.dateTo) {
+    loadArticles() // lấy toàn bộ bài viết
+  } else {
+    loadFilteredArticles()
+  }
 }, { deep: true })
 
 // Lifecycle
 onMounted(() => {
-  loadArticles()
+  loadArticles(),loadTotal()
 })
 </script>
 
