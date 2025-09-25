@@ -113,99 +113,43 @@ const loadTotal = async () => {
   }
 }
 
-const mockArticles = [
-  {
-    id: 1,
-    title: 'Công nghệ AI sẽ thay đổi thế giới như thế nào?',
-    thumbnail: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=400',
-    category: 'Công nghệ',
-    published_time: '2024-01-15T10:30:00Z'
-  },
-  {
-    id: 2,
-    title: 'Khám phá ẩm thực Việt Nam qua các món đặc sản',
-    thumbnail: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400',
-    category: 'Ẩm thực',
-    published_time: '2024-01-14T08:15:00Z'
-  },
-  {
-    id: 3,
-    title: 'Du lịch Hà Nội - Top 10 địa điểm không thể bỏ qua',
-    thumbnail: 'https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?w=400',
-    category: 'Du lịch',
-    published_time: '2024-01-13T14:20:00Z'
-  },
-  {
-    id: 4,
-    title: 'Thể thao Việt Nam tại SEA Games 2024',
-    thumbnail: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=400',
-    category: 'Thể thao',
-    published_time: '2024-01-12T16:45:00Z'
-  },
-  {
-    id: 5,
-    title: 'Kinh tế Việt Nam phục hồi mạnh mẽ sau đại dịch',
-    thumbnail: 'https://images.unsplash.com/photo-1611224923853-80b023f02d71?w=400',
-    category: 'Kinh tế',
-    published_time: '2024-01-11T09:30:00Z'
-  },
-  {
-    id: 6,
-    title: 'Giáo dục số hóa - Xu hướng tương lai',
-    thumbnail: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400',
-    category: 'Giáo dục',
-    published_time: '2024-01-10T11:00:00Z'
-  },
-  {
-    id: 7,
-    title: 'Y học hiện đại và những đột phá mới',
-    thumbnail: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400',
-    category: 'Y tế',
-    published_time: '2024-01-09T13:15:00Z'
-  },
-  {
-    id: 8,
-    title: 'Bảo vệ môi trường - Trách nhiệm của mỗi người',
-    thumbnail: 'https://images.unsplash.com/photo-1569163139394-de4e4f43e4e3?w=400',
-    category: 'Môi trường',
-    published_time: '2024-01-08T07:45:00Z'
-  },
-  {
-    id: 9,
-    title: 'Startup Việt Nam và câu chuyện thành công',
-    thumbnail: 'https://images.unsplash.com/photo-1556745757-8d76bdb6984b?w=400',
-    category: 'Công nghệ',
-    published_time: '2024-01-07T15:30:00Z'
-  },
-  {
-    id: 10,
-    title: 'Văn hóa truyền thống trong thời đại hiện đại',
-    thumbnail: 'https://images.unsplash.com/photo-1548013146-72479768bada?w=400',
-    category: 'Văn hóa',
-    published_time: '2024-01-06T10:20:00Z'
-  },
-  {
-    id: 11,
-    title: 'Phát triển bền vững trong nông nghiệp',
-    thumbnail: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=400',
-    category: 'Nông nghiệp',
-    published_time: '2024-01-05T12:10:00Z'
-  },
-  {
-    id: 12,
-    title: 'Công nghệ Blockchain và ứng dụng thực tế',
-    thumbnail: 'https://images.unsplash.com/photo-1639322537228-f710d846310a?w=400',
-    category: 'Công nghệ',
-    published_time: '2024-01-04T14:55:00Z'
-  }
-]
-
 // Computed properties
 const availableCategories = computed(() => {
   const categories = [...new Set(allArticles.value.map(article => article.category))]
   return categories.sort()
 })
 
+const parseVietnameseDate = (dateString) => {
+  try {
+    // Format: "Thứ ba, 23/9/2025, 10:31 (GMT+7)"
+    const dateMatch = dateString.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+    if (!dateMatch) return null
+
+    const [, day, month, year] = dateMatch
+    
+    // Tách lấy phần thời gian nếu có
+    const timeMatch = dateString.match(/(\d{1,2}):(\d{2})/)
+    let hour = 0, minute = 0
+    if (timeMatch) {
+      [, hour, minute] = timeMatch.map(Number)
+    }
+
+    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day), hour, minute)
+  } catch (error) {
+    console.error('Error parsing date:', dateString, error)
+    return null
+  }
+}
+const formatDateForDisplay = (dateString) => {
+  const date = parseVietnameseDate(dateString)
+  if (!date) return dateString
+
+  const day = date.getDate().toString().padStart(2, '0')
+  const month = (date.getMonth() + 1).toString().padStart(2, '0')
+  const year = date.getFullYear()
+  
+  return `${day}/${month}/${year}`
+}
 const filteredArticles = computed(() => {
   let filtered = allArticles.value
 
@@ -223,10 +167,12 @@ const filteredArticles = computed(() => {
     filtered = filtered.filter(article => article.category === filters.value.category)
   }
 
-  // Date filters
+  // Date filters với xử lý Vietnamese date format
   if (filters.value.dateFrom) {
     filtered = filtered.filter(article => {
-      const articleDate = new Date(article.published_time)
+      const articleDate = parseVietnameseDate(article.published_time)
+      if (!articleDate) return false
+      
       const fromDate = new Date(filters.value.dateFrom)
       return articleDate >= fromDate
     })
@@ -234,7 +180,9 @@ const filteredArticles = computed(() => {
 
   if (filters.value.dateTo) {
     filtered = filtered.filter(article => {
-      const articleDate = new Date(article.published_time)
+      const articleDate = parseVietnameseDate(article.published_time)
+      if (!articleDate) return false
+      
       const toDate = new Date(filters.value.dateTo)
       toDate.setHours(23, 59, 59, 999) // End of day
       return articleDate <= toDate
