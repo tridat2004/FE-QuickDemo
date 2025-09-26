@@ -1,14 +1,16 @@
-import axios from 'axios';
+import axios from 'axios'
 
 export default defineNuxtPlugin((nuxtApp) => {
+  const config = useRuntimeConfig()
+
   const api = axios.create({
-    baseURL: process.env.NUXT_PUBLIC_API_URL ||'http://localhost:3001' , // Gọi trực tiếp đến cổng 3001
+    baseURL: config.public.apiBase, // ✅ lấy từ runtime config
     timeout: 10000,
-  });
+  })
 
   return {
     provide: {
       api,
     },
-  };
-});
+  }
+})

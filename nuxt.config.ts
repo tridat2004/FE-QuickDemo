@@ -33,8 +33,8 @@ export default defineNuxtConfig({
     
     // Public keys (exposed to client-side)
     public: {
-      apiBase: '/api',
-      apiUrl: process.env.NUXT_PUBLIC_API_URL,
+      // apiBase: '/api',
+        apiBase: process.env.NUXT_PUBLIC_API_URL || 'http://localhost:3001',
     }
   },
 
