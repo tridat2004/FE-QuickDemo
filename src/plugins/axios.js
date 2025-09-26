@@ -5,7 +5,7 @@ export default defineNuxtPlugin((nuxtApp) => {
 
   const api = axios.create({
     baseURL: config.public.apiBase, // ✅ lấy từ runtime config
-    timeout: 10000,
+    timeout: 60000,
   })
 
   return {
