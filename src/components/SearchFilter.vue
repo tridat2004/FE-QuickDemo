@@ -46,6 +46,7 @@
           @change="handleDateChange"
           type="date"
           class="filter-date"
+          @input="onDateFromInput"
         >
       </div>
 
@@ -56,6 +57,7 @@
           @change="handleDateChange"
           type="date"
           class="filter-date"
+          @input="onDateToInput"
         >
       </div>
 
@@ -118,6 +120,18 @@ const handleCategoryChange = () => {
 
 const handleDateChange = () => {
   emit('update:dateFrom', localDateFrom.value)
+  emit('update:dateTo', localDateTo.value)
+}
+
+const onDateFromInput = () => {
+  console.log('Date from input:', localDateFrom.value)
+  // Đảm bảo emit cả khi input thủ công
+  emit('update:dateFrom', localDateFrom.value)
+}
+
+const onDateToInput = () => {
+  console.log('Date to input:', localDateTo.value)
+  // Đảm bảo emit cả khi input thủ công
   emit('update:dateTo', localDateTo.value)
 }
 
