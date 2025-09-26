@@ -20,10 +20,6 @@ import NewsItem from './CategoryStats.vue';
 import CategoryFilter from './ArticleCard.vue';
 import DateFilter from './SearchFilter.vue';
 
-const news = ref([
-  { id: 1, title: 'Tin tức 1', thumbnail: 'https://via.placeholder.com/150', category: 'Thể thao', published_time: '2025-09-23' },
-  { id: 2, title: 'Tin tức 2', thumbnail: 'https://via.placeholder.com/150', category: 'Công nghệ', published_time: '2025-09-22' },
-]);
 
 const filters = ref({ category: '', date: '', search: '' });
 

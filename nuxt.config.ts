@@ -33,7 +33,8 @@ export default defineNuxtConfig({
     
     // Public keys (exposed to client-side)
     public: {
-      apiBase: '/api'
+      apiBase: '/api',
+      apiUrl: process.env.NUXT_PUBLIC_API_URL,
     }
   },
 
